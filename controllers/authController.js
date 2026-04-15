@@ -1,4 +1,3 @@
-const bcrypt = require('bcryptjs');
 const { OAuth2Client } = require('google-auth-library');
 const User = require('../models/User');
 const OTP = require('../models/OTP');
@@ -15,6 +14,7 @@ const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 const OTP_PURPOSES = {
   SIGNUP: 'signup',
 };
+const MAX_OTP_ATTEMPTS = 5;
 
 const sendOtp = asyncHandler(async (req, res) => {
   const email = normalizeEmail(req.body.email);
@@ -45,6 +45,7 @@ const sendOtp = asyncHandler(async (req, res) => {
       email,
       purpose: OTP_PURPOSES.SIGNUP,
       otp: hashOtp(otpCode),
+      attempts: 0,
       expiresAt,
     },
     {
@@ -65,6 +66,8 @@ const sendOtp = asyncHandler(async (req, res) => {
 const verifyOtp = asyncHandler(async (req, res) => {
   const email = normalizeEmail(req.body.email);
   const otpCode = req.body.otp.trim();
+  const name = String(req.body.name || '').trim();
+  const phone = String(req.body.phone || '').trim();
 
   const otpRecord = await OTP.findOne({
     email,
@@ -87,67 +90,66 @@ const verifyOtp = asyncHandler(async (req, res) => {
 
   const isOtpValid = verifyOtpHash(otpCode, otpRecord.otp);
   if (!isOtpValid) {
-    throw new ApiError('Invalid OTP', 400);
+    otpRecord.attempts = Number(otpRecord.attempts || 0) + 1;
+
+    if (otpRecord.attempts >= MAX_OTP_ATTEMPTS) {
+      await otpRecord.deleteOne();
+      throw new ApiError('Maximum OTP attempts exceeded. Please request a new OTP.', 400);
+    }
+
+    await otpRecord.save();
+    throw new ApiError(
+      `Invalid OTP. ${MAX_OTP_ATTEMPTS - otpRecord.attempts} attempts remaining.`,
+      400
+    );
   }
 
-  await User.findOneAndUpdate(
-    { email },
-    {
-      email,
-      isVerified: true,
-      role: getRoleForEmail(email),
-    },
-    {
-      upsert: true,
-      new: true,
-      setDefaultsOnInsert: true,
-    }
-  );
+  if (!name || name.length < 2 || name.length > 60) {
+    throw new ApiError('Name must be between 2 and 60 characters.', 400);
+  }
 
-  await otpRecord.deleteOne();
+  if (!/^\+?[0-9]{7,15}$/.test(phone)) {
+    throw new ApiError('Valid phone number is required.', 400);
+  }
 
-  sendSuccess(res, {
-    statusCode: 200,
-    message: 'Email verified successfully. You can now sign up.',
-  });
-});
+  let user = await User.findOne({ email }).select('+password');
 
-const signup = asyncHandler(async (req, res) => {
-  const email = normalizeEmail(req.body.email);
-  const { name, phone, password } = req.body;
-
-  const user = await User.findOne({ email }).select('+password');
-
-  if (user && user.googleId) {
+  if (user?.googleId) {
+    await otpRecord.deleteOne();
     throw new ApiError(
       'Account already exists with Google login. Please continue with Google.',
       409
     );
   }
 
-  if (!user || !user.isVerified) {
-    throw new ApiError('Please verify your email with OTP before signing up.', 403);
+  if (user?.password) {
+    await otpRecord.deleteOne();
+    throw new ApiError('This email is already registered. Please log in.', 409);
   }
 
-  if (user.isSuspended) {
-    throw new ApiError('User suspended', 403);
+  if (!user) {
+    user = await User.create({
+      name,
+      email,
+      phone,
+      isVerified: true,
+      role: getRoleForEmail(email),
+    });
+  } else {
+    user.name = name;
+    user.phone = phone;
+    user.isVerified = true;
+    syncUserRoleByEmail(user, email);
+    await user.save();
   }
 
-  if (user.password) {
-    throw new ApiError('Account already exists. Please log in.', 409);
-  }
-
-  user.name = String(name || '').trim();
-  user.phone = String(phone || '').trim();
-  user.password = await bcrypt.hash(password, 12);
-  syncUserRoleByEmail(user, email);
-  await user.save();
+  await otpRecord.deleteOne();
 
   const safeUser = await User.findById(user._id);
 
   sendSuccess(res, {
     statusCode: 201,
-    message: 'Signup successful.',
+    message: 'Account created successfully.',
     token: generateToken(safeUser._id),
     user: serializeUser(safeUser),
   });
@@ -253,7 +255,6 @@ const googleLogin = asyncHandler(async (req, res) => {
 module.exports = {
   sendOtp,
   verifyOtp,
-  signup,
   login,
   googleLogin,
 };
