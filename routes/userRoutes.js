@@ -7,11 +7,12 @@ const {
 } = require('../controllers/userController');
 const { protect } = require('../middleware/authMiddleware');
 const validateRequest = require('../middleware/validateRequest');
+const { otpRateLimiter } = require('../middleware/rateLimiter');
 
 const router = express.Router();
 
 router.get('/profile', protect, getProfile);
-router.post('/profile/send-otp', protect, sendProfileUpdateOtp);
+router.post('/profile/send-otp', protect, otpRateLimiter, sendProfileUpdateOtp);
 router.put(
   '/profile',
   protect,

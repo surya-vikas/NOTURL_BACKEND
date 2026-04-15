@@ -8,14 +8,14 @@ const {
   googleLogin,
 } = require('../controllers/authController');
 const validateRequest = require('../middleware/validateRequest');
-const { authRateLimiter } = require('../middleware/rateLimiter');
+const { authRateLimiter, otpRateLimiter } = require('../middleware/rateLimiter');
 
 const router = express.Router();
 
-router.use(authRateLimiter);
 
 router.post(
   '/send-otp',
+  otpRateLimiter,
   [body('email').isEmail().withMessage('Valid email is required')],
   validateRequest,
   sendOtp
@@ -69,6 +69,7 @@ router.post(
 
 router.post(
   '/login',
+  authRateLimiter,
   [
     body('email').isEmail().withMessage('Valid email is required'),
     body('password').notEmpty().withMessage('Password is required'),
@@ -79,6 +80,7 @@ router.post(
 
 router.post(
   '/google-login',
+  authRateLimiter,
   [
     body().custom((_, { req }) => {
       if (!req.body?.idToken && !req.body?.token) {

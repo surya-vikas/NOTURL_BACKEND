@@ -18,6 +18,7 @@ const OTP_PURPOSES = {
 
 const sendOtp = asyncHandler(async (req, res) => {
   const email = normalizeEmail(req.body.email);
+  console.log('OTP request received:', email);
   const existingUser = await User.findOne({ email }).select('+password');
 
   if (existingUser && existingUser.googleId) {

@@ -12,6 +12,9 @@ const { sendSuccess } = require('./utils/response');
 
 const app = express();
 
+// Trust the first proxy hop (Vercel/Render) so rate limiting can resolve client IPs.
+app.set('trust proxy', 1);
+
 app.disable('x-powered-by');
 
 app.use(helmet());

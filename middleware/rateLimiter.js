@@ -11,6 +11,18 @@ const authRateLimiter = rateLimit({
   },
 });
 
+const otpRateLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: 'Too many OTP requests. Please try again in a few minutes.',
+  },
+});
+
 module.exports = {
   authRateLimiter,
+  otpRateLimiter,
 };

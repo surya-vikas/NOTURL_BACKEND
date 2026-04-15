@@ -31,6 +31,7 @@ const getProfile = asyncHandler(async (req, res) => {
 
 const sendProfileUpdateOtp = asyncHandler(async (req, res) => {
   const email = normalizeEmail(req.user.email);
+  console.log('OTP request received:', email);
   if (!email) {
     throw new ApiError('Email is required to verify profile updates', 400);
   }
