@@ -23,6 +23,10 @@ if (process.env.NODE_ENV !== 'production') {
   app.use(morgan('dev'));
 }
 
+app.get('/', (req, res) => {
+  res.send('🚀 NotURL Backend is Live!');
+});
+
 app.get('/api/health', (req, res) => {
   sendSuccess(res, {
     statusCode: 200,
