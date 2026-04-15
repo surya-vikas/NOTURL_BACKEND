@@ -25,7 +25,7 @@ app.use(express.urlencoded({ extended: true }));
 if (process.env.NODE_ENV !== 'production') {
   app.use(morgan('dev'));
 }
-
+app.set("trust proxy", 1);
 app.get('/', (req, res) => {
   res.send('🚀 NotURL Backend is Live!');
 });
