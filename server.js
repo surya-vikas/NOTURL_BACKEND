@@ -24,13 +24,11 @@ const startServer = async () => {
 };
 
 process.on('uncaughtException', (error) => {
-  console.error(`Uncaught Exception: ${error.message}`);
-  process.exit(1);
+  console.error('Uncaught Exception:', error);
 });
 
 process.on('unhandledRejection', (reason) => {
-  console.error(`Unhandled Rejection: ${reason}`);
-  process.exit(1);
+  console.error('Unhandled Rejection:', reason);
 });
 
 startServer();
