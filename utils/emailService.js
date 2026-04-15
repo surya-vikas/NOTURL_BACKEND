@@ -1,34 +1,28 @@
 const nodemailer = require('nodemailer');
 const ApiError = require('./apiError');
 
-// 🔥 Create transporter (more reliable config)
 const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 587,
-  secure: false, // TLS
+  host: 'smtp.gmail.com',
+  port: 465,
+  secure: true,
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
 });
 
-// 🔥 Verify SMTP connection at startup
-transporter.verify((error, success) => {
-  if (error) {
-    console.error("❌ SMTP CONNECTION ERROR:", error);
-  } else {
-    console.log("✅ SMTP server is ready to send emails");
-  }
+const serializeEmailError = (error) => ({
+  message: error.message,
+  code: error.code,
+  command: error.command,
+  response: error.response,
+  responseCode: error.responseCode,
+  stack: error.stack,
 });
 
-// 🎨 Email template
 const getOtpMailTemplate = (otpCode, context) => {
   const isProfileUpdate = context === 'profile_update';
-
-  const heading = isProfileUpdate
-    ? 'Confirm your profile update'
-    : 'Verify your email';
-
+  const heading = isProfileUpdate ? 'Confirm your profile update' : 'Verify your email';
   const message = isProfileUpdate
     ? 'Use this OTP to confirm your NotURL profile changes:'
     : 'Use this OTP to complete your NotURL signup:';
@@ -48,10 +42,8 @@ const getOtpMailTemplate = (otpCode, context) => {
   `;
 };
 
-// 🚀 Send OTP Email
 const sendOtpEmail = async (email, otpCode, context = 'signup') => {
   const isProfileUpdate = context === 'profile_update';
-
   const mailOptions = {
     from: `NotURL Security <${process.env.EMAIL_USER}>`,
     to: email,
@@ -62,22 +54,34 @@ const sendOtpEmail = async (email, otpCode, context = 'signup') => {
   };
 
   try {
-    console.log("📩 Sending OTP to:", email);
+    console.log('OTP email send started:', { email, context });
+    console.log('Verifying Gmail SMTP connection...');
+
+    await transporter.verify();
+
+    console.log('Gmail SMTP connection verified');
+    console.log('Sending OTP email to:', email);
 
     const info = await transporter.sendMail(mailOptions);
 
-    console.log("✅ Email sent successfully:", info.response);
+    console.log('OTP email sent successfully:', {
+      messageId: info.messageId,
+      response: info.response,
+      accepted: info.accepted,
+      rejected: info.rejected,
+    });
 
-    return info;
-
+    return {
+      success: true,
+      info,
+    };
   } catch (error) {
-    // 🔥 FULL DEBUG LOGS (VERY IMPORTANT)
-    console.error("❌ EMAIL SENDING FAILED");
-    console.error("➡️ Message:", error.message);
-    console.error("➡️ Code:", error.code);
-    console.error("➡️ Full Error:", error);
+    console.error(
+      'OTP email sending failed:',
+      JSON.stringify(serializeEmailError(error), null, 2)
+    );
 
-    throw new ApiError('Failed to send OTP email', 500);
+    throw new ApiError('Failed to send OTP email. Please try again later.', 500);
   }
 };
 
