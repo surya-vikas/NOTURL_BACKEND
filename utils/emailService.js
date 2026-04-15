@@ -1,0 +1,45 @@
+const nodemailer = require('nodemailer');
+
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+});
+
+const getOtpMailTemplate = (otpCode, context) => {
+  const isProfileUpdate = context === 'profile_update';
+  const heading = isProfileUpdate ? 'Confirm your profile update' : 'Verify your email';
+  const message = isProfileUpdate
+    ? 'Use this OTP to confirm your NotURL profile changes:'
+    : 'Use this OTP to complete your NotURL signup:';
+
+  return `
+      <div style="font-family: Arial, sans-serif; color: #111827;">
+        <h2 style="margin-bottom: 8px;">${heading}</h2>
+        <p style="margin-top: 0;">${message}</p>
+        <p style="font-size: 28px; font-weight: 700; letter-spacing: 4px; margin: 16px 0;">${otpCode}</p>
+        <p>This OTP expires in <strong>5 minutes</strong>.</p>
+        <p style="color: #6b7280; font-size: 12px;">If you did not request this, you can ignore this email.</p>
+      </div>
+    `;
+};
+
+const sendOtpEmail = async (email, otpCode, context = 'signup') => {
+  const isProfileUpdate = context === 'profile_update';
+  const mailOptions = {
+    from: `NotURL Security <${process.env.EMAIL_USER}>`,
+    to: email,
+    subject: isProfileUpdate
+      ? 'Your NotURL profile update code'
+      : 'Your NotURL verification code',
+    html: getOtpMailTemplate(otpCode, context),
+  };
+
+  await transporter.sendMail(mailOptions);
+};
+
+module.exports = {
+  sendOtpEmail,
+};
