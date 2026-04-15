@@ -1,10 +1,17 @@
 const nodemailer = require('nodemailer');
 const ApiError = require('./apiError');
 
-const transporter = nodemailer.createTransport({
+const EMAIL_PROVIDER = String(process.env.EMAIL_PROVIDER || 'gmail').toLowerCase();
+const SMTP_TIMEOUT_MS = 10 * 1000;
+const MAX_TIMEOUT_RETRIES = 2;
+
+const gmailTransporter = nodemailer.createTransport({
   host: 'smtp.gmail.com',
   port: 465,
   secure: true,
+  connectionTimeout: SMTP_TIMEOUT_MS,
+  greetingTimeout: SMTP_TIMEOUT_MS,
+  socketTimeout: SMTP_TIMEOUT_MS,
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
@@ -12,6 +19,7 @@ const transporter = nodemailer.createTransport({
 });
 
 const serializeEmailError = (error) => ({
+  name: error.name,
   message: error.message,
   code: error.code,
   command: error.command,
@@ -19,6 +27,18 @@ const serializeEmailError = (error) => ({
   responseCode: error.responseCode,
   stack: error.stack,
 });
+
+const isTimeoutError = (error) => {
+  const code = String(error.code || '').toUpperCase();
+  const message = String(error.message || '').toLowerCase();
+
+  return (
+    code.includes('TIMEOUT') ||
+    code === 'ETIMEDOUT' ||
+    message.includes('timeout') ||
+    message.includes('timed out')
+  );
+};
 
 const getOtpMailTemplate = (otpCode, context) => {
   const isProfileUpdate = context === 'profile_update';
@@ -42,42 +62,151 @@ const getOtpMailTemplate = (otpCode, context) => {
   `;
 };
 
-const sendOtpEmail = async (email, otpCode, context = 'signup') => {
+const buildMailOptions = (email, otpCode, context) => {
   const isProfileUpdate = context === 'profile_update';
-  const mailOptions = {
-    from: `NotURL Security <${process.env.EMAIL_USER}>`,
+  const from = process.env.EMAIL_FROM || `NotURL Security <${process.env.EMAIL_USER}>`;
+
+  return {
+    from,
     to: email,
     subject: isProfileUpdate
       ? 'Your NotURL profile update code'
       : 'Your NotURL verification code',
     html: getOtpMailTemplate(otpCode, context),
   };
+};
+
+const sendWithGmail = async (mailOptions) => {
+  let lastError;
+
+  for (let attempt = 1; attempt <= MAX_TIMEOUT_RETRIES + 1; attempt += 1) {
+    try {
+      console.log('Sending OTP email with Gmail SMTP:', {
+        to: mailOptions.to,
+        attempt,
+        maxAttempts: MAX_TIMEOUT_RETRIES + 1,
+      });
+
+      const info = await gmailTransporter.sendMail(mailOptions);
+
+      console.log('Gmail OTP email sent successfully:', {
+        messageId: info.messageId,
+        response: info.response,
+        accepted: info.accepted,
+        rejected: info.rejected,
+      });
+
+      return {
+        success: true,
+        provider: 'gmail',
+        info,
+      };
+    } catch (error) {
+      lastError = error;
+
+      console.error(
+        'Gmail OTP email attempt failed:',
+        JSON.stringify(error, null, 2)
+      );
+      console.error(
+        'Gmail OTP email attempt failed details:',
+        JSON.stringify(serializeEmailError(error), null, 2)
+      );
+
+      if (!isTimeoutError(error) || attempt > MAX_TIMEOUT_RETRIES) {
+        throw error;
+      }
+
+      console.log('Retrying Gmail OTP email after timeout:', {
+        to: mailOptions.to,
+        nextAttempt: attempt + 1,
+      });
+    }
+  }
+
+  throw lastError;
+};
+
+const sendWithResend = async (mailOptions) => {
+  if (!process.env.RESEND_API_KEY) {
+    throw new Error('RESEND_API_KEY is not configured');
+  }
+
+  if (typeof fetch !== 'function') {
+    throw new Error('Global fetch is not available for Resend email sending');
+  }
+
+  console.log('Sending OTP email with Resend:', { to: mailOptions.to });
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), SMTP_TIMEOUT_MS);
+
+  let response;
+  try {
+    response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: mailOptions.from,
+        to: [mailOptions.to],
+        subject: mailOptions.subject,
+        html: mailOptions.html,
+      }),
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    const error = new Error('Resend email request failed');
+    error.responseCode = response.status;
+    error.response = data;
+    throw error;
+  }
+
+  console.log('Resend OTP email sent successfully:', data);
+
+  return {
+    success: true,
+    provider: 'resend',
+    info: data,
+  };
+};
+
+const sendOtpEmail = async (email, otpCode, context = 'signup') => {
+  const mailOptions = buildMailOptions(email, otpCode, context);
 
   try {
     console.log('OTP email send started:', { email, context });
-    console.log('Verifying Gmail SMTP connection...');
-
-    await transporter.verify();
-
-    console.log('Gmail SMTP connection verified');
     console.log('Sending OTP email to:', email);
 
-    const info = await transporter.sendMail(mailOptions);
+    if (EMAIL_PROVIDER === 'resend') {
+      return await sendWithResend(mailOptions);
+    }
 
-    console.log('OTP email sent successfully:', {
-      messageId: info.messageId,
-      response: info.response,
-      accepted: info.accepted,
-      rejected: info.rejected,
-    });
+    try {
+      return await sendWithGmail(mailOptions);
+    } catch (gmailError) {
+      if (!process.env.RESEND_API_KEY) {
+        throw gmailError;
+      }
 
-    return {
-      success: true,
-      info,
-    };
+      console.error('Gmail failed. Falling back to Resend for OTP email.');
+      return await sendWithResend(mailOptions);
+    }
   } catch (error) {
     console.error(
       'OTP email sending failed:',
+      JSON.stringify(error, null, 2)
+    );
+    console.error(
+      'OTP email sending failed details:',
       JSON.stringify(serializeEmailError(error), null, 2)
     );
 
