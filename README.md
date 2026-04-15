@@ -9,7 +9,7 @@ Production-ready authentication backend using Node.js, Express, MongoDB, OTP ema
 - dotenv
 - bcryptjs
 - jsonwebtoken
-- nodemailer
+- Resend
 - google-auth-library
 
 ## Folder Structure
