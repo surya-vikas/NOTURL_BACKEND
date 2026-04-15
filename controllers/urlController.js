@@ -213,7 +213,10 @@ const redirectToOriginalUrl = asyncHandler(async (req, res) => {
     return res.status(410).send('This link is inactive');
   }
 
-  throw new ApiError('Short URL not found', 404);
+  return res.status(404).json({
+    success: false,
+    message: 'Short URL not found',
+  });
 });
 
 module.exports = {

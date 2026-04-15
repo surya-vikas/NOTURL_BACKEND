@@ -27,6 +27,13 @@ app.get('/', (req, res) => {
   res.send('🚀 NotURL Backend is Live!');
 });
 
+app.get('/api', (req, res) => {
+  res.json({
+    success: true,
+    message: 'API is working 🚀',
+  });
+});
+
 app.get('/api/health', (req, res) => {
   sendSuccess(res, {
     statusCode: 200,
