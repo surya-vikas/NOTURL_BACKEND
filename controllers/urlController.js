@@ -151,7 +151,7 @@ const updateUrl = asyncHandler(async (req, res) => {
   const updatedUrl = await UrlModel.findOneAndUpdate(
     { _id: req.params.id, user: req.user._id },
     { originalUrl: normalizedOriginalUrl },
-    { new: true }
+    { returnDocument: 'after' }
   );
 
   if (!updatedUrl) {
@@ -178,7 +178,7 @@ const updateUrlStatus = asyncHandler(async (req, res) => {
   const updatedUrl = await UrlModel.findOneAndUpdate(
     { _id: req.params.id, user: req.user._id },
     { isActive },
-    { new: true }
+    { returnDocument: 'after' }
   );
 
   if (!updatedUrl) {
@@ -201,7 +201,7 @@ const redirectToOriginalUrl = asyncHandler(async (req, res) => {
   const activeUrl = await UrlModel.findOneAndUpdate(
     { shortId, isActive: true },
     { $inc: { clicks: 1 } },
-    { new: true }
+    { returnDocument: 'after' }
   );
 
   if (activeUrl) {

@@ -51,7 +51,6 @@ const sendOtp = asyncHandler(async (req, res) => {
     },
     {
       upsert: true,
-      new: true,
       setDefaultsOnInsert: true,
     }
   );
