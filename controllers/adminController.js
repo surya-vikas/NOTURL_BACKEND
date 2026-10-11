@@ -4,6 +4,7 @@ const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/apiError');
 const { sendSuccess } = require('../utils/response');
 const { getRoleForEmail } = require('../utils/adminRole');
+const { serializeUrl } = require('../utils/serializers');
 
 const getAdminUsersLinks = asyncHandler(async (req, res) => {
   const [users, urls] = await Promise.all([
@@ -17,15 +18,12 @@ const getAdminUsersLinks = asyncHandler(async (req, res) => {
   const rows = urls.map((url) => {
     const linkedUser = url.user || null;
     const email = linkedUser?.email || null;
+    const serializedUrl = serializeUrl(url);
 
     return {
-      id: String(url._id),
-      shortId: url.shortId,
-      shortUrl: url.shortUrl,
-      originalUrl: url.originalUrl,
+      ...serializedUrl,
       clicks: Number(url.clicks || 0),
       isActive: url.isActive !== false,
-      createdAt: url.createdAt,
       userId: linkedUser?._id ? String(linkedUser._id) : null,
       name: linkedUser?.name || null,
       email,

@@ -11,6 +11,7 @@ const { normalizeEmail, syncUserRoleByEmail } = require('../utils/adminRole');
 const OTP_PURPOSES = {
   PROFILE_UPDATE: 'profile_update',
 };
+const MAX_OTP_ATTEMPTS = 5;
 
 const normalizeOptionalField = (value) => {
   if (value === undefined || value === null) {
@@ -101,6 +102,13 @@ const updateProfile = asyncHandler(async (req, res) => {
 
     const isOtpValid = verifyOtpHash(otpCode, otpRecord.otp);
     if (!isOtpValid) {
+      otpRecord.attempts = Number(otpRecord.attempts || 0) + 1;
+      if (otpRecord.attempts >= MAX_OTP_ATTEMPTS) {
+        await otpRecord.deleteOne();
+        throw new ApiError('Maximum OTP attempts exceeded. Please request a new OTP.', 400);
+      }
+
+      await otpRecord.save();
       throw new ApiError('Invalid OTP', 400);
     }
 

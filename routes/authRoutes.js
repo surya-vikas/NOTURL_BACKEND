@@ -21,6 +21,7 @@ router.post(
 
 router.post(
   '/verify-otp',
+  otpRateLimiter,
   [
     body('email').isEmail().withMessage('Valid email is required'),
     body('otp')

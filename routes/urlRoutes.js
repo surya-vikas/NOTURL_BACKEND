@@ -21,8 +21,8 @@ router.post(
     body('customAlias')
       .trim()
       .optional({ checkFalsy: true })
-      .isLength({ min: 3, max: 32 })
-      .withMessage('Custom alias must be between 3 and 32 characters')
+      .isLength({ min: 6, max: 32 })
+      .withMessage('Custom alias must be at least 6 characters and no more than 32')
       .matches(/^[A-Za-z0-9_-]+$/)
       .withMessage('Custom alias can only include letters, numbers, "-" and "_"'),
   ],

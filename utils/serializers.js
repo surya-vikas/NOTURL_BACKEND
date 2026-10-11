@@ -1,3 +1,10 @@
+const trimTrailingSlashes = (value) => String(value || '').replace(/\/+$/, '');
+
+const getBaseUrl = () => {
+  const baseUrl = process.env.BASE_URL || process.env.BACKEND_BASE_URL || 'http://localhost:5000';
+  return trimTrailingSlashes(baseUrl);
+};
+
 const serializeUser = (user) => ({
   id: String(user._id),
   name: user.name,
@@ -15,7 +22,7 @@ const serializeUrl = (url) => ({
   id: String(url._id),
   originalUrl: url.originalUrl,
   shortId: url.shortId,
-  shortUrl: url.shortUrl,
+  shortUrl: `${getBaseUrl()}/${url.shortId}`,
   clicks: url.clicks,
   isActive: url.isActive,
   user: url.user ? String(url.user) : null,

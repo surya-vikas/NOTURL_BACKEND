@@ -1,4 +1,5 @@
 const { OAuth2Client } = require('google-auth-library');
+const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const OTP = require('../models/OTP');
 const asyncHandler = require('../utils/asyncHandler');

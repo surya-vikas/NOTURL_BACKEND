@@ -5,11 +5,11 @@ const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/apiError');
 const { sendSuccess } = require('../utils/response');
 const { serializeUrl } = require('../utils/serializers');
-const BASE_URL = process.env.BASE_URL || "http://localhost:5000";
+const BASE_URL = process.env.BASE_URL || process.env.BACKEND_BASE_URL || "http://localhost:5000";
 
 const SHORT_ID_LENGTH = 8;
 const MAX_SHORT_ID_ATTEMPTS = 7;
-const CUSTOM_ALIAS_PATTERN = /^[A-Za-z0-9_-]{3,32}$/;
+const CUSTOM_ALIAS_PATTERN = /^[A-Za-z0-9_-]{6,32}$/;
 
 const trimTrailingSlashes = (value) => String(value || '').replace(/\/+$/, '');
 const normalizedBaseUrl = trimTrailingSlashes(BASE_URL);
@@ -42,7 +42,7 @@ const normalizeCustomAlias = (customAlias) => {
 
   if (!CUSTOM_ALIAS_PATTERN.test(candidate)) {
     throw new ApiError(
-      'Custom alias must be 3-32 characters using letters, numbers, "-" or "_".',
+      'Custom alias must be at least 6 characters and no more than 32, using letters, numbers, "-" or "_".',
       400
     );
   }

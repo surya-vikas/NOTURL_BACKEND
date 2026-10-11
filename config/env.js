@@ -3,8 +3,19 @@ const dotenv = require('dotenv');
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
+if (!process.env.PORT) {
+  process.env.PORT = '5000';
+}
+
+if (!process.env.BASE_URL && process.env.BACKEND_BASE_URL) {
+  process.env.BASE_URL = process.env.BACKEND_BASE_URL;
+}
+
+if (!process.env.BASE_URL) {
+  process.env.BASE_URL = `http://localhost:${process.env.PORT}`;
+}
+
 const requiredEnvVars = [
-  'PORT',
   'MONGO_URI',
   'JWT_SECRET',
   'RESEND_API_KEY',
